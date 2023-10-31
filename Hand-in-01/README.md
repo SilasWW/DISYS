@@ -16,7 +16,3 @@ The goal of this project is to implement the dining philosophers problem in Go, 
 - A sequentialisation of the system (executing only one philosopher at a time) is not acceptable. I.e., philosophers must be able to request a fork at any time.
 
 - Philosophers must display (print on screen) any state change (eating or thinking) during their execution.
-
-
-## Organization
-This repository is a part of the [DISYS-SWW](https://github.com/DISYS-SWW) organization.
