@@ -26,7 +26,3 @@ c) In case the network changes the order in which messages are delivered, how wo
 d) In case messages can be delayed or lost, how does your implementation handle message loss?
 
 e) Why is the 3-way handshake important?
-
-
-## Organization
-This repo is a part of the [DISYS-SWW](https://github.com/DISYS-SWW) organization.
