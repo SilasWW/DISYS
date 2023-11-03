@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package someName;
+
+option go_package = "grpc/proto";
+
+message Publish {
+  int64 clientId = 1;
+  string message = 2;
+}
+
+message Broadcast {
+  string serverName = 1;
+  string time = 2;
+  string message = 3;
+}
+
+service ChitChat {
+  rpc chat(Publish) returns (Broadcast);
+}
