@@ -14,13 +14,13 @@ import (
 
 type Client struct {
 	id         int
-	portnumber int
 }
 
 var (
 	clientPort = flag.Int("cPort", 0, "client port number")
 	serverPort = flag.Int("sPort", 0, "server port number")
 )
+var lamport int64
 
 func main() {
 	// Parse the flags to get the port for the client
@@ -36,6 +36,12 @@ func main() {
 
 	for {
 
+	}
+}
+
+func handleLamport(serverLamport int64){
+	if(serverLamport > lamport){
+		lamport = serverLamport
 	}
 }
 
@@ -58,17 +64,19 @@ func waitForTimeRequest(client *Client) {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		input := scanner.Text()
-		log.Printf("Client asked for time with input: %s\n", input)
+		log.Printf("You send the message: %s to the server \n", input)
 
 		// Ask the server for the time
-		timeReturnMessage, err := serverConnection.Chat(context.Background(), &proto.Publish{
-			ClientId: int64(client.id),
+		lamport++
+		ReturnMessage, err := serverConnection.Chat(context.Background(), &proto.Publish{
+			ClientId: int64(client.id), Message: input, ClientLamport: lamport,
 		})
 
 		if err != nil {
-			log.Printf(err.Error())
+			log.Print(err.Error())
 		} else {
-			log.Printf("Server %s says the time is %s\n", timeReturnMessage.ServerName, timeReturnMessage.Time)
+			handleLamport(ReturnMessage.ServerLamport)
+			log.Printf("MAINFRAME: New message: ' %s ' at lamport time: %d \n", ReturnMessage.Message, lamport)
 		}
 	}
 }

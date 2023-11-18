@@ -8,7 +8,6 @@ import (
 	"net"
 	proto "someName/grpc"
 	"strconv"
-	"time"
 )
 
 type Server struct {
@@ -18,6 +17,7 @@ type Server struct {
 }
 
 var port = flag.Int("port", 0, "server port number")
+var lamport int64 = 0
 
 func main() {
 	// Get the port from the command line when the server is run
@@ -37,6 +37,12 @@ func main() {
 
 	}
 
+}
+
+func handleLamport(clientLamport int64){
+	if(clientLamport > lamport){
+		lamport = clientLamport
+	}
 }
 
 func startServer(server *Server) {
@@ -61,5 +67,6 @@ func startServer(server *Server) {
 }
 
 func (c *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Broadcast, error) {
-	return &proto.Broadcast{ServerName: "Only Server", Time: time.Now().String(), Message: in.Message}, nil
+	handleLamport(in.ClientLamport)
+	return &proto.Broadcast{ServerName: "MAINFRAME", ServerLamport: lamport, Message: in.Message}, nil
 }
