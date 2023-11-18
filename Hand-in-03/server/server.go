@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"flag"
-	"google.golang.org/grpc"
+	"fmt"
 	"log"
 	"net"
 	proto "someName/grpc"
 	"strconv"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Server struct {
@@ -18,6 +21,9 @@ type Server struct {
 
 var port = flag.Int("port", 0, "server port number")
 var lamport int64 = 0
+var serverName string = "MAINFRAME"
+
+var clientConns map[int64]proto.ChitChatClient = make(map[int64]proto.ChitChatClient)
 
 func main() {
 	// Get the port from the command line when the server is run
@@ -66,7 +72,60 @@ func startServer(server *Server) {
 	}
 }
 
+//receiving a chat message and then broadcasting it to all clients
 func (c *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Broadcast, error) {
+	//time handling
 	handleLamport(in.ClientLamport)
-	return &proto.Broadcast{ServerName: "MAINFRAME", ServerLamport: lamport, Message: in.Message}, nil
+	
+	//send back publish
+	lamport++
+	return &proto.Broadcast{ServerName: serverName , ServerLamport: lamport, Message: in.Message}, nil
+}
+
+//receiving a join message, adding client to list and publish join to all clients
+func (c *Server) Join(ctx context.Context, in *proto.Publish) (*proto.Acknowledge, error) {
+	//time handling
+	handleLamport(in.ClientLamport)
+
+	//dial back to the client and save in map
+	lamport++
+	dialClient(in.ClientId)
+
+	//broadcast to all clients
+	broadMessage(in.ClientId)
+
+	//send back ack
+	lamport++
+	return &proto.Acknowledge{Name: serverName, ServerLamport: lamport}, nil
+}
+
+func dialClient(clientID int64){
+	//dial client and connect
+	conn, err := grpc.Dial("localhost:"+strconv.Itoa(int(clientID)), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("Could not connect to port %d", clientID)
+		} else {
+			log.Printf("Connected to the Client at port %d\n", clientID)
+		}
+	
+	//add to map
+	clientConns[clientID] = proto.NewChitChatClient(conn)
+}
+
+func broadMessage(clientID int64){
+	var message string = fmt.Sprintf("New person in the chat. Say hi to: %d", clientID)
+
+	for _, value := range clientConns{
+		lamport++
+		Response, err := value.Trans(context.Background(), &proto.Broadcast{
+			ServerName: serverName, Message: message, ServerLamport: lamport,
+		})
+		if err != nil {
+			log.Print(err.Error())
+		} else {
+			handleLamport(Response.ServerLamport)
+			lamport++
+		}
+	}
+	
 }

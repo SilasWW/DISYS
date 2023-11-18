@@ -21,6 +21,7 @@ var (
 	serverPort = flag.Int("sPort", 0, "server port number")
 )
 var lamport int64
+var serverConnection proto.ChitChatClient
 
 func main() {
 	// Parse the flags to get the port for the client
@@ -31,8 +32,14 @@ func main() {
 		id: *clientPort,
 	}
 
-	// Wait for the client (user) to ask for the time
-	go waitForTimeRequest(client)
+	//Connect to server
+	serverConnection, _ = connectToServer();
+
+	//Send entrance message
+	enterChat()
+
+	//Wait for the client (user) to ask for the time
+	go waitForMessage(client)
 
 	for {
 
@@ -56,9 +63,22 @@ func connectToServer() (proto.ChitChatClient, error) {
 	return proto.NewChitChatClient(conn), nil
 }
 
-func waitForTimeRequest(client *Client) {
-	// Connect to the server
-	serverConnection, _ := connectToServer()
+func enterChat(client *Client){
+	lamport++
+	Response, err := serverConnection.Join(context.Background(), &proto.Publish{
+		ClientId: int64(client.id), Message: "New client joined the server", ClientLamport: lamport,
+	})
+
+	if err != nil {
+			log.Print(err.Error())
+		} else {
+			handleLamport(Response.ServerLamport)
+			lamport++
+			log.Printf("You joined chatroom on server: %s at lamport time: %d \n", Response.ServerName, lamport)
+		}
+}
+
+func waitForMessage(client *Client) {
 
 	// Wait for input in the client terminal
 	scanner := bufio.NewScanner(os.Stdin)
@@ -76,6 +96,7 @@ func waitForTimeRequest(client *Client) {
 			log.Print(err.Error())
 		} else {
 			handleLamport(ReturnMessage.ServerLamport)
+			lamport++
 			log.Printf("MAINFRAME: New message: ' %s ' at lamport time: %d \n", ReturnMessage.Message, lamport)
 		}
 	}
