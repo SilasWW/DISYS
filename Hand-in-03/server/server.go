@@ -77,7 +77,7 @@ func (c *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Acknowledg
 	handleLamport(in.ClientLamport)
 
 	//add message to list to be broadcasted
-	var message string = fmt.Sprintf("%d: %s",in.ClientId, in.Message)
+	var message string = fmt.Sprintf("Lamport time: %d, client: %d message: %s",in.ClientLamport, in.ClientId, in.Message)
 	mList = append(mList, message)
 
 	//send back ack
@@ -99,15 +99,16 @@ func (c *Server) Join(in *proto.Publish, stream proto.ChitChat_JoinServer) error
 	var messageKnown int = len(mList);
 	for {
 		if messageKnown < len(mList) {
-			for _, v := range mList{
+			for i := messageKnown; i < len(mList); i++{
+				lamport++
 				if err := stream.Send(&proto.Broadcast{
-					ServerName: serverName, Message: v, ServerLamport: lamport,
+					ServerName: serverName, Message: mList[i], ServerLamport: lamport,
 				}); err != nil{
 					return err
 				}
 			}
-			messageKnown = len(mList)
 		}
+		messageKnown = len(mList)
 		time.Sleep(1 * time.Second)
 	}
 }

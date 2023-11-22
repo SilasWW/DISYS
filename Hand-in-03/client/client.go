@@ -69,11 +69,13 @@ func enterChat(client *Client){
 
 	//the following is adapted from grpc.io : https://grpc.io/docs/languages/go/basics/
 
+	//sends initial join to server, receives stream for subscribing to further messages
 	lamport++
 	stream, err := serverConnection.Join(context.Background(), &proto.Publish{
 		ClientId: int64(client.id), Message: "New client joined the server", ClientLamport: lamport,
 	})
 
+	// infinite loop receiving new responses from stream
 	if err != nil {
 			log.Print(err.Error())
 		} else {
@@ -86,6 +88,7 @@ func enterChat(client *Client){
 				if err != nil{
 					log.Print(err.Error())
 				}
+				
 				handleLamport(Response.ServerLamport)
 				lamport++
 				
@@ -101,9 +104,8 @@ func waitForMessage(client *Client) {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		input := scanner.Text()
-		log.Printf("You send the message: %s to the server \n", input)
 
-		// Ask the server for the time
+		// Send Message to the server we get an unimportant response :)
 		lamport++
 		ReturnMessage, err := serverConnection.Chat(context.Background(), &proto.Publish{
 			ClientId: int64(client.id), Message: input, ClientLamport: lamport,
@@ -113,7 +115,6 @@ func waitForMessage(client *Client) {
 			log.Print(err.Error())
 		} else {
 			handleLamport(ReturnMessage.Lamport)
-			//log.Printf("%s: Your message has been sent at lamport time: %d \n",ReturnMessage.Name, lamport)
 			lamport++
 		}
 	}
