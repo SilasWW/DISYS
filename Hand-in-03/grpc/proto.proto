@@ -18,11 +18,10 @@ message Broadcast {
 
 message Acknowledge {
   string Name = 1;
-  int64 serverLamport = 2;
+  int64 Lamport = 2;
 }
 
 service ChitChat {
-  rpc join(Publish) returns (Acknowledge);
-  rpc chat(Publish) returns (Broadcast);
-  rpc trans(Broadcast) returns (Acknowledge);
-}
+  rpc join(Publish) returns (stream Broadcast);
+  rpc chat(Publish) returns (Acknowledge);
+  }

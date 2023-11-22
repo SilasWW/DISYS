@@ -8,9 +8,9 @@ import (
 	"net"
 	proto "someName/grpc"
 	"strconv"
+	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Server struct {
@@ -22,8 +22,7 @@ type Server struct {
 var port = flag.Int("port", 0, "server port number")
 var lamport int64 = 0
 var serverName string = "MAINFRAME"
-
-var clientConns map[int64]proto.ChitChatClient = make(map[int64]proto.ChitChatClient)
+var mList []string
 
 func main() {
 	// Get the port from the command line when the server is run
@@ -73,59 +72,43 @@ func startServer(server *Server) {
 }
 
 //receiving a chat message and then broadcasting it to all clients
-func (c *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Broadcast, error) {
-	//time handling
-	handleLamport(in.ClientLamport)
-	
-	//send back publish
-	lamport++
-	return &proto.Broadcast{ServerName: serverName , ServerLamport: lamport, Message: in.Message}, nil
-}
-
-//receiving a join message, adding client to list and publish join to all clients
-func (c *Server) Join(ctx context.Context, in *proto.Publish) (*proto.Acknowledge, error) {
+func (c *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Acknowledge, error) {
 	//time handling
 	handleLamport(in.ClientLamport)
 
-	//dial back to the client and save in map
-	lamport++
-	dialClient(in.ClientId)
-
-	//broadcast to all clients
-	broadMessage(in.ClientId)
+	//add message to list to be broadcasted
+	var message string = fmt.Sprintf("%d: %s",in.ClientId, in.Message)
+	mList = append(mList, message)
 
 	//send back ack
 	lamport++
-	return &proto.Acknowledge{Name: serverName, ServerLamport: lamport}, nil
+	return &proto.Acknowledge{Name: serverName , Lamport: lamport}, nil
 }
 
-func dialClient(clientID int64){
-	//dial client and connect
-	conn, err := grpc.Dial("localhost:"+strconv.Itoa(int(clientID)), grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			log.Fatalf("Could not connect to port %d", clientID)
-		} else {
-			log.Printf("Connected to the Client at port %d\n", clientID)
-		}
-	
-	//add to map
-	clientConns[clientID] = proto.NewChitChatClient(conn)
-}
+//receiving a join message, starting async function that streams messages to client (subscription)
+func (c *Server) Join(in *proto.Publish, stream proto.ChitChat_JoinServer) error {
+	//time handling
+	handleLamport(in.ClientLamport)
 
-func broadMessage(clientID int64){
-	var message string = fmt.Sprintf("New person in the chat. Say hi to: %d", clientID)
+	//add new welcome message to list 
+	var message string = fmt.Sprintf("%d : %s", in.ClientId, in.Message)
+	mList = append(mList,message)
 
-	for _, value := range clientConns{
-		lamport++
-		Response, err := value.Trans(context.Background(), &proto.Broadcast{
-			ServerName: serverName, Message: message, ServerLamport: lamport,
-		})
-		if err != nil {
-			log.Print(err.Error())
-		} else {
-			handleLamport(Response.ServerLamport)
-			lamport++
+	//subscribe client to messages
+	//unending loop checking lenght of slice 
+	var messageKnown int = len(mList);
+	for {
+		if messageKnown < len(mList) {
+			for _, v := range mList{
+				if err := stream.Send(&proto.Broadcast{
+					ServerName: serverName, Message: v, ServerLamport: lamport,
+				}); err != nil{
+					return err
+				}
+			}
+			messageKnown = len(mList)
 		}
+		time.Sleep(1 * time.Second)
 	}
-	
 }
+

@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"context"
 	"flag"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"io"
 	"log"
 	"os"
 	proto "someName/grpc"
 	"strconv"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
@@ -36,7 +38,7 @@ func main() {
 	serverConnection, _ = connectToServer();
 
 	//Send entrance message
-	enterChat()
+	go enterChat(client)
 
 	//Wait for the client (user) to ask for the time
 	go waitForMessage(client)
@@ -64,18 +66,33 @@ func connectToServer() (proto.ChitChatClient, error) {
 }
 
 func enterChat(client *Client){
+
+	//the following is adapted from grpc.io : https://grpc.io/docs/languages/go/basics/
+
 	lamport++
-	Response, err := serverConnection.Join(context.Background(), &proto.Publish{
+	stream, err := serverConnection.Join(context.Background(), &proto.Publish{
 		ClientId: int64(client.id), Message: "New client joined the server", ClientLamport: lamport,
 	})
 
 	if err != nil {
 			log.Print(err.Error())
 		} else {
-			handleLamport(Response.ServerLamport)
-			lamport++
-			log.Printf("You joined chatroom on server: %s at lamport time: %d \n", Response.ServerName, lamport)
+			log.Print("You joined the chatroom server!")
+			for {
+				Response,err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				if err != nil{
+					log.Print(err.Error())
+				}
+				handleLamport(Response.ServerLamport)
+				lamport++
+				
+				log.Printf(Response.Message)
+			}
 		}
+			
 }
 
 func waitForMessage(client *Client) {
@@ -95,9 +112,9 @@ func waitForMessage(client *Client) {
 		if err != nil {
 			log.Print(err.Error())
 		} else {
-			handleLamport(ReturnMessage.ServerLamport)
+			handleLamport(ReturnMessage.Lamport)
+			//log.Printf("%s: Your message has been sent at lamport time: %d \n",ReturnMessage.Name, lamport)
 			lamport++
-			log.Printf("MAINFRAME: New message: ' %s ' at lamport time: %d \n", ReturnMessage.Message, lamport)
 		}
 	}
 }
