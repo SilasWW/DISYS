@@ -2,9 +2,9 @@
 
 To run the program, you must first add the server. You do so by running the command: `go run server/server.go -port <port-number>`. We recommend using port number 5454 like this: `go run server/server.go -port 5454`
 
-Secondly you add a number of clients, with the following command `go run client/client.go -cPort <client-port> -sPort <server-port>`. The 'server-port' must match the port-number you assigned the server. Each client you add, must have its own port-number.
+Secondly you add a number of clients. The following command: `go run client/client.go -cPort <client-port> -sPort <server-port>`, adds one client. The 'server-port' must match the port-number you assigned the server. Each client you add, must have its own port-number.
 
-In any client terminal, you can now type a message and press enter to publish a message. 
+The client has now joined, and you can type a message and press enter to publish it. The client leaves when sending the message `/leave`.
 
 # Chitty Chat
 
