@@ -24,4 +24,5 @@ message Acknowledge {
 service ChitChat {
   rpc join(Publish) returns (stream Broadcast);
   rpc chat(Publish) returns (Acknowledge);
+  rpc leave(Publish) returns (Acknowledge);
   }

@@ -24,6 +24,7 @@ var (
 )
 var lamport int64
 var serverConnection proto.ChitChatClient
+var quit chan bool = make(chan bool)
 
 func main() {
 	// Parse the flags to get the port for the client
@@ -43,9 +44,8 @@ func main() {
 	//Wait for the client (user) to ask for the time
 	go waitForMessage(client)
 
-	for {
-
-	}
+	//channel to control when to quit
+	<- quit
 }
 
 func handleLamport(serverLamport int64){
@@ -88,7 +88,7 @@ func enterChat(client *Client){
 				if err != nil{
 					log.Print(err.Error())
 				}
-				
+
 				handleLamport(Response.ServerLamport)
 				lamport++
 				
@@ -105,17 +105,33 @@ func waitForMessage(client *Client) {
 	for scanner.Scan() {
 		input := scanner.Text()
 
-		// Send Message to the server we get an unimportant response :)
-		lamport++
-		ReturnMessage, err := serverConnection.Chat(context.Background(), &proto.Publish{
-			ClientId: int64(client.id), Message: input, ClientLamport: lamport,
-		})
-
-		if err != nil {
-			log.Print(err.Error())
-		} else {
-			handleLamport(ReturnMessage.Lamport)
+		if input == "/leave"{
+			//send leave publish
 			lamport++
+			_, err := serverConnection.Leave(context.Background(), &proto.Publish{
+				ClientId: int64(client.id), Message: "Client leaving", ClientLamport: lamport,
+			})
+
+			if err != nil {
+				log.Print(err.Error())
+			}
+
+			//leave by entering value into channel
+			quit <- true
+
+		}else {
+			// Send Message to the server we get an unimportant response :)
+			lamport++
+			ReturnMessage, err := serverConnection.Chat(context.Background(), &proto.Publish{
+				ClientId: int64(client.id), Message: input, ClientLamport: lamport,
+			})
+
+			if err != nil {
+				log.Print(err.Error())
+			} else {
+				handleLamport(ReturnMessage.Lamport)
+				lamport++
+			}
 		}
 	}
 }

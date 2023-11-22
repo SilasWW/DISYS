@@ -72,7 +72,7 @@ func startServer(server *Server) {
 }
 
 //receiving a chat message and then broadcasting it to all clients
-func (c *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Acknowledge, error) {
+func (s *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Acknowledge, error) {
 	//time handling
 	handleLamport(in.ClientLamport)
 
@@ -86,12 +86,12 @@ func (c *Server) Chat(ctx context.Context, in *proto.Publish) (*proto.Acknowledg
 }
 
 //receiving a join message, starting async function that streams messages to client (subscription)
-func (c *Server) Join(in *proto.Publish, stream proto.ChitChat_JoinServer) error {
+func (s *Server) Join(in *proto.Publish, stream proto.ChitChat_JoinServer) error {
 	//time handling
 	handleLamport(in.ClientLamport)
 
 	//add new welcome message to list 
-	var message string = fmt.Sprintf("%d : %s", in.ClientId, in.Message)
+	var message string = fmt.Sprintf("Participant %d has joined Chitty-Chat at Lamport time %d", in.ClientId, lamport)
 	mList = append(mList,message)
 
 	//subscribe client to messages
@@ -113,3 +113,15 @@ func (c *Server) Join(in *proto.Publish, stream proto.ChitChat_JoinServer) error
 	}
 }
 
+func (s *Server) Leave(ctx context.Context, in *proto.Publish) (*proto.Acknowledge, error) {
+	//handle time
+	handleLamport(in.ClientLamport)
+
+	//send message
+	var message = fmt.Sprintf("Participant %d left Chitty-Chat at lamport time %d", in.ClientId, lamport)
+	mList = append(mList, message)
+	lamport++
+
+	//return ack
+	return &proto.Acknowledge{Name: serverName , Lamport: lamport}, nil
+}
