@@ -1,6 +1,6 @@
 # How to run the program:
 
-To run the program, you must first add the server. You do so by running the command: `go run server/server.go -port <port-number>`. We recommend using port number 5454 like this: `go run server/server.go -port 5454`
+To run the program, you must first add the server. You do so by running the command: `go run server/server.go -port <port-number>`. We have had success using port number 5454 like this: `go run server/server.go -port 5454`
 
 Secondly you add a number of clients. The following command: `go run client/client.go -cPort <client-port> -sPort <server-port>`, adds one client. The 'server-port' must match the port-number you assigned the server. Each client you add, must have its own port-number.
 
