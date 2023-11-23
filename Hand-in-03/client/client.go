@@ -4,23 +4,27 @@ import (
 	"bufio"
 	"context"
 	"flag"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"io"
 	"log"
 	"os"
 	proto "someName/grpc"
 	"strconv"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
 	id         int
-	portnumber int
 }
 
 var (
 	clientPort = flag.Int("cPort", 0, "client port number")
 	serverPort = flag.Int("sPort", 0, "server port number")
 )
+var lamport int64
+var serverConnection proto.ChitChatClient
+var quit chan bool = make(chan bool)
 
 func main() {
 	// Parse the flags to get the port for the client
@@ -31,11 +35,22 @@ func main() {
 		id: *clientPort,
 	}
 
-	// Wait for the client (user) to ask for the time
-	go waitForTimeRequest(client)
+	//Connect to server
+	serverConnection, _ = connectToServer();
 
-	for {
+	//Send entrance message
+	go enterChat(client)
 
+	//Wait for the client (user) to ask for the time
+	go waitForMessage(client)
+
+	//channel to control when to quit
+	<- quit
+}
+
+func handleLamport(serverLamport int64){
+	if(serverLamport > lamport){
+		lamport = serverLamport
 	}
 }
 
@@ -50,25 +65,73 @@ func connectToServer() (proto.ChitChatClient, error) {
 	return proto.NewChitChatClient(conn), nil
 }
 
-func waitForTimeRequest(client *Client) {
-	// Connect to the server
-	serverConnection, _ := connectToServer()
+func enterChat(client *Client){
+
+	//the following is adapted from grpc.io : https://grpc.io/docs/languages/go/basics/
+
+	//sends initial join to server, receives stream for subscribing to further messages
+	lamport++
+	stream, err := serverConnection.Join(context.Background(), &proto.Publish{
+		ClientId: int64(client.id), Message: "New client joined the server", ClientLamport: lamport,
+	})
+
+	// infinite loop receiving new responses from stream
+	if err != nil {
+			log.Print(err.Error())
+		} else {
+			log.Print("You joined the chatroom server!")
+			for {
+				Response,err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				if err != nil{
+					log.Print(err.Error())
+				}
+
+				handleLamport(Response.ServerLamport)
+				lamport++
+				
+				log.Printf(Response.Message)
+			}
+		}
+			
+}
+
+func waitForMessage(client *Client) {
 
 	// Wait for input in the client terminal
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		input := scanner.Text()
-		log.Printf("Client asked for time with input: %s\n", input)
 
-		// Ask the server for the time
-		timeReturnMessage, err := serverConnection.Chat(context.Background(), &proto.Publish{
-			ClientId: int64(client.id),
-		})
+		if input == "/leave"{
+			//send leave publish
+			lamport++
+			_, err := serverConnection.Leave(context.Background(), &proto.Publish{
+				ClientId: int64(client.id), Message: "Client leaving", ClientLamport: lamport,
+			})
 
-		if err != nil {
-			log.Printf(err.Error())
-		} else {
-			log.Printf("Server %s says the time is %s\n", timeReturnMessage.ServerName, timeReturnMessage.Time)
+			if err != nil {
+				log.Print(err.Error())
+			}
+
+			//leave by entering value into channel
+			quit <- true
+
+		}else {
+			// Send Message to the server we get an unimportant response :)
+			lamport++
+			ReturnMessage, err := serverConnection.Chat(context.Background(), &proto.Publish{
+				ClientId: int64(client.id), Message: input, ClientLamport: lamport,
+			})
+
+			if err != nil {
+				log.Print(err.Error())
+			} else {
+				handleLamport(ReturnMessage.Lamport)
+				lamport++
+			}
 		}
 	}
 }

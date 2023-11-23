@@ -7,14 +7,22 @@ option go_package = "grpc/proto";
 message Publish {
   int64 clientId = 1;
   string message = 2;
+  int64 clientLamport = 3;
 }
 
 message Broadcast {
   string serverName = 1;
-  string time = 2;
-  string message = 3;
+  string message = 2;
+  int64 serverLamport = 3;
+}
+
+message Acknowledge {
+  string Name = 1;
+  int64 Lamport = 2;
 }
 
 service ChitChat {
-  rpc chat(Publish) returns (Broadcast);
-}
+  rpc join(Publish) returns (stream Broadcast);
+  rpc chat(Publish) returns (Acknowledge);
+  rpc leave(Publish) returns (Acknowledge);
+  }
